@@ -9,6 +9,8 @@
 const https = require('https')
 
 const Webuntis = {
+
+    /* searches schools by name, returns a list of matches */
     findSchool: function(search) {
         const data = JSON.stringify({
             id: "wu_schulsuche-1601401688595",
@@ -29,7 +31,7 @@ const Webuntis = {
         });
     },
 
-    /* Sets cookie `schoolname` */
+    /* Sets cookie `schoolname` for later use. Webuntis needs cookies for identifying school */
     setupCookie: function(school) {
         return new Promise(function(resolve, reject) {
             Webuntis.request(
@@ -44,11 +46,8 @@ const Webuntis = {
         });
     },
 
+    /* Returns a list of departments from school */
     findDepartments: function(school) {
-        if (school.cookie == undefined) {
-            console.log("Forgot `setupCookie`?");
-        }
-
         return new Promise(function(resolve, reject) {
             Webuntis.request(
                 school.server, 
@@ -59,7 +58,7 @@ const Webuntis = {
             ).then(res => {
                 let departments = JSON.parse(res.content).data.filters[0].elements;
 
-                for (let i in departments) {
+                for (i in departments) {
                     departments[i].school = school;
                 }
 
@@ -68,6 +67,7 @@ const Webuntis = {
         });
     },
 
+    /* Returns a list of classes in department */
     findClasses: function(department) {
         return new Promise(function(resolve, reject) {
             Webuntis.request(
@@ -79,7 +79,7 @@ const Webuntis = {
             ).then(res => {
                 let classes = JSON.parse(res.content).data.elements;
 
-                for (let i in classes) {
+                for (i in classes) {
                     classes[i].department = department;
                 }
 
@@ -88,7 +88,10 @@ const Webuntis = {
         });
     },
 
-    // https://stackoverflow.com/questions/23593052/format-javascript-date-as-yyyy-mm-dd
+    /*
+        Returns current date in yyyy-mm-dd format, used in webuntis url
+        original: https://stackoverflow.com/questions/23593052/format-javascript-date-as-yyyy-mm-dd
+    */
     getDate: function() {
         let d = new Date();
         let month = '' + (d.getMonth() + 1);
@@ -103,6 +106,7 @@ const Webuntis = {
         return [year, month, day].join('-');
     },
 
+    /* Returns timetable of class */
     getTimetable: function(clazz) {
         let date = Webuntis.getDate();
 
@@ -119,9 +123,9 @@ const Webuntis = {
         });
     },
 
+    /* Helper function of `mapTimetableToWeek` */
     getElementFromTimetable: function(timetable, type, id) {
         let elements = timetable.elements;
-        let i;
 
         for (i in elements) {
             if (elements[i].type == type && elements[i].id == id) {
@@ -132,10 +136,12 @@ const Webuntis = {
         return null;
     },
 
+    /* sorts timetable provided by `getTimetable` to week days -> returns list with 5 elements */
     mapTimetableToWeek: function(timetable) {
         let elementPeriods = timetable.elementPeriods[Object.keys(timetable.elementPeriods)[0]];
         let elements = timetable.elements;
-        let lessons = {};
+        let lessons = {}, lessonsTrimed = {};
+        let idx = 0;
         let i, j;
 
         for (i in elementPeriods) {
@@ -144,9 +150,11 @@ const Webuntis = {
                 startTime: elementPeriods[i].startTime,
                 name: null,
                 room: null,
+                state: elementPeriods[i].cellState,
                 teachers: [],
             };
 
+            // Fill in generall information stored in `timetable.elements` by its id
             for (j = 0; j < elementPeriods[i].elements.length; ++ j) {
                 let e = elementPeriods[i].elements[j];
                 let n = Webuntis.getElementFromTimetable(timetable, e.type, e.id).name;
@@ -163,6 +171,7 @@ const Webuntis = {
                 }
             }
 
+            // Put lesson to list
             if (lessons[lesson.date] == undefined) {
                 lessons[lesson.date] = [ lesson ];
             } else {
@@ -171,23 +180,43 @@ const Webuntis = {
         }
 
         for (i in lessons) {
+            // Sort list by start time
             lessons[i].sort((a, b) => a.startTime - b.startTime);
+
+            // lessons starting at same time are put into the same array
+            for (j = 0; j < lessons[i].length; ++ j) {
+                if (lessonsTrimed[i] == undefined) {
+                    lessonsTrimed[i] = [];
+                }
+
+                if (lessonsTrimed[i][idx] == undefined) {
+                    lessonsTrimed[i][idx] = [lessons[i][j]];
+                } else {
+                    lessonsTrimed[i][idx].push(lessons[i][j]);
+                }
+
+                // if true, next lesson starts else there is another lesson starting at the same time
+                if (j+1 < lessons[i].length && lessons[i][j].startTime != lessons[i][j+1].startTime) {
+                    idx++;
+                }
+            }
         }
 
-        return lessons;
+        return lessonsTrimed;
     },
 
+    /* general function for sending a request */
     request: function(hostname, path, data, method, cookie = '') {
         const options = {
-          hostname: hostname,
-          port: 443,
-          path: path,
-          method: method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': data.length,
-            'Cookie': cookie,
-          }
+            hostname: hostname,
+            port: 443,
+            path: path,
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': data.length,
+                'Cookie': cookie,
+            }
         }
 
         return new Promise(function(resolve, reject) {
