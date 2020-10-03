@@ -148,6 +148,7 @@ const Webuntis = {
             let lesson = {
                 date: elementPeriods[i].date,
                 startTime: elementPeriods[i].startTime,
+                endTime: elementPeriods[i].endTime,
                 name: null,
                 room: null,
                 state: elementPeriods[i].cellState,
