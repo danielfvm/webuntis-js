@@ -155,8 +155,8 @@ client.on("message", function(message) {
         message.channel.send(new Discord.MessageEmbed()
             .setColor("#f36f24")
             .setTitle("Bot commands")
-            .setDescription("A list of commands for the Webuntis Bot."),
-            .addField("Timetable", `${config.PREFIX} <class>`, true),
+            .setDescription("A list of commands for the Webuntis Bot.")
+            .addField("Timetable", `${config.PREFIX} <class>`, true)
             .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
         );
         return;
