@@ -186,7 +186,7 @@ client.on("message", function(message) {
 
         // Show today's schedule
         if (today) {
-            let today = "2020-10-01".split('-').join(''); /*Webuntis.getDate().split('-').join('');*/
+            let today = Webuntis.getDate().split('-').join('');
 
             if (weeks[today] != undefined) {
                 let lesson = createLessonStringFromDay(weeks[today]);
