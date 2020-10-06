@@ -5,8 +5,8 @@ A JavaScript Discord Bot for [Webuntis](https://webuntis.com/)
 If you want to invite this Bot to your discord server, click [here](https://discord.com/api/oauth2/authorize?client_id=761504244163280906&permissions=67584&scope=bot)
 
 ## Disclaimer
-*This bot currently only works for HTL-Hollabrunn!
-*This is not an offical project from Webuntis!
+* This bot currently only works for HTL-Hollabrunn!
+* This is not an offical project from Webuntis!
 
 ## Commands
 ###Timetable
@@ -33,6 +33,6 @@ node bot.js
 ```
 
 ## Changelog
-*Fixed Timezone
-*Added yesterday/tomorrow tag to commands
-*Updated help page
+* Fixed Timezone
+* Added yesterday/tomorrow tag to commands
+* Updated help page
