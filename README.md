@@ -1,5 +1,5 @@
 # webuntis-js
-A JavaScript Discord Bot for [Webuntis](https://webuntis.com/)
+A JavaScript Discord Bot for [Webuntis.com](https://webuntis.com/)
 
 ## Invite
 If you want to invite this Bot to your discord server, click [here](https://discord.com/api/oauth2/authorize?client_id=761504244163280906&permissions=67584&scope=bot)
@@ -9,13 +9,13 @@ If you want to invite this Bot to your discord server, click [here](https://disc
 * This is not an offical project from Webuntis!
 
 ## Commands
-###Timetable
+* Timetable
 ?u <class>
-###Today's Schedule
+* Today's Schedule
 ?u <class> today
-###Tomorrow's Schedule
+* Tomorrow's Schedule
 ?u <class> tomorrow
-###Yesterday's Schedule
+* Yesterday's Schedule
 ?u <class> yesterday
 
 ## Installation
