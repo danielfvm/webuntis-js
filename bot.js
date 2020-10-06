@@ -6,9 +6,13 @@
     A Discord Bot for Webuntis
 */
 
+/* Set timezone to vienna */
+process.env.TZ = "Europe/Vienna";
+
 const Webuntis = require("./webuntis.js");
 const Discord = require('discord.js');
 const config = require("./config.json");
+
 
 /* Week day names */
 const WEEKDAYS = [
@@ -154,15 +158,19 @@ client.on("message", function(message) {
     if (args[0].toLowerCase() == "help") {
         message.channel.send(new Discord.MessageEmbed()
             .setColor("#f36f24")
-            .setTitle("Bot commands")
-            .setDescription("A list of commands for the Webuntis Bot.")
-            .addField("Timetable", `${config.PREFIX} <class>`, true)
-            .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
+            .setTitle("Help page")
+            .setDescription("A list of commands for the Webuntis Bot. For more infos, changelog or if you want to add this bot to your server go [here](https://github.com/danielfvm/webuntis-js).")
+            .addField("Timetable", `${config.PREFIX} <class>`, false)
+            .addField("Today's Schedule", `${config.PREFIX} <class> today`, false)
+            .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, false)
+            .addField("Yesterday's Schedule", `${config.PREFIX} <class> yesterday`, false)
         );
         return;
     }
 
     let today = args.includes("today");
+    let tomorrow = args.includes("tomorrow");
+    let yesterday = args.includes("yesterday");
     let clazz = getClassByName(args[0]);
 
     // Error, class not found
@@ -185,11 +193,21 @@ client.on("message", function(message) {
             .setThumbnail("https://www.htl-hl.ac.at/web/fileadmin/_processed_/f/3/csm_HTL_Logo_fin_RGB_weiss_037fb886bf.png"); // htl logo
 
         // Show today's schedule
-        if (today) {
-            let today = Webuntis.getDate().split('-').join('');
+        if (today || tomorrow || yesterday) {
+            let date = new Date();
 
-            if (weeks[today] != undefined) {
-                let lesson = createLessonStringFromDay(weeks[today]);
+            if (tomorrow) {
+                date.setDate(date.getDate()+1);
+            }
+
+            if (yesterday) {
+                date.setDate(date.getDate()-1);
+            }
+
+            let fmdate = Webuntis.fmDate(date, '');
+
+            if (weeks[fmdate] != undefined) {
+                let lesson = createLessonStringFromDay(weeks[fmdate]);
                 embed.addField("Hours", lesson[0], true);
                 embed.addField("Lessons", lesson[1], true);
                 embed.addField("Teachers", lesson[2], true);

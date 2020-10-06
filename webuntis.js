@@ -92,8 +92,7 @@ const Webuntis = {
         Returns current date in yyyy-mm-dd format, used in webuntis url
         original: https://stackoverflow.com/questions/23593052/format-javascript-date-as-yyyy-mm-dd
     */
-    getDate: function() {
-        let d = new Date();
+    fmDate: function(d, s = '-') {
         let month = '' + (d.getMonth() + 1);
         let day = '' + d.getDate();
         let year = d.getFullYear();
@@ -103,12 +102,12 @@ const Webuntis = {
         if (day.length < 2) 
             day = '0' + day;
 
-        return [year, month, day].join('-');
+        return [year, month, day].join(s);
     },
 
     /* Returns timetable of class */
     getTimetable: function(clazz) {
-        let date = Webuntis.getDate();
+        let date = Webuntis.fmDate(new Date());
 
         return new Promise(function(resolve, reject) {
             Webuntis.request(
