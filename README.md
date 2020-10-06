@@ -9,14 +9,10 @@ If you want to invite this Bot to your discord server, click [here](https://disc
 * This is not an offical project from Webuntis!
 
 ## Commands
-* Timetable
-?u <class>
-* Today's Schedule
-?u <class> today
-* Tomorrow's Schedule
-?u <class> tomorrow
-* Yesterday's Schedule
-?u <class> yesterday
+* Timetable `!u <class>`
+* Today's Schedule `!u <class> today`
+* Tomorrow's Schedule `!u <class> tomorrow`
+* Yesterday's Schedule `!u <class> yesterday`
 
 ## Installation
 If you want to build it yourself then do following:
