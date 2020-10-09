@@ -16,11 +16,11 @@ const config = require("./config.json");
 
 /* Week day names */
 const WEEKDAYS = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday"
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday"
 ];
 
 /* Color codes of departments */
@@ -45,6 +45,10 @@ function getClassByName(name) {
             return classes[i];
         }
     }
+}
+
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
 /* Original: https://stackoverflow.com/questions/4313841/insert-a-string-at-a-specific-index */
@@ -164,6 +168,7 @@ client.on("message", function(message) {
             .addField("Today's Schedule", `${config.PREFIX} <class> today`, false)
             .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, false)
             .addField("Yesterday's Schedule", `${config.PREFIX} <class> yesterday`, false)
+            .addField("Weekday's Schedule", `${config.PREFIX} <class> weekday`, false)
         );
         return;
     }
@@ -171,6 +176,7 @@ client.on("message", function(message) {
     let today = args.includes("today");
     let tomorrow = args.includes("tomorrow");
     let yesterday = args.includes("yesterday");
+    let weekday = args.length > 1 ? WEEKDAYS.includes(args[1].toLowerCase()) : false;
     let clazz = getClassByName(args[0]);
 
     // Error, class not found
@@ -193,7 +199,7 @@ client.on("message", function(message) {
             .setThumbnail("https://www.htl-hl.ac.at/web/fileadmin/_processed_/f/3/csm_HTL_Logo_fin_RGB_weiss_037fb886bf.png"); // htl logo
 
         // Show today's schedule
-        if (today || tomorrow || yesterday) {
+        if (today || tomorrow || yesterday || weekday) {
             let date = new Date();
 
             if (tomorrow) {
@@ -204,6 +210,10 @@ client.on("message", function(message) {
                 date.setDate(date.getDate()-1);
             }
 
+            if (weekday) {
+                date.setDate(date.getDate()-date.getDay()+WEEKDAYS.indexOf(args[1].toLowerCase())+1);
+            }
+
             let fmdate = Webuntis.fmDate(date, '');
 
             if (weeks[fmdate] != undefined) {
@@ -212,11 +222,11 @@ client.on("message", function(message) {
                 embed.addField("Lessons", lesson[1], true);
                 embed.addField("Teachers", lesson[2], true);
             } else {
-                embed.addField("No class today", ".", true);
+                embed.addField("No class " + (tomorrow ? "tomorrow" : yesterday ? "yesterday" : "today"), ".", true);
             }
         } else { // show timetable
             for (i in weeks) {
-                embed.addField(WEEKDAYS[wday], createLessonStringFromDay(weeks[i])[1], true);
+                embed.addField(capitalizeFirstLetter(WEEKDAYS[wday]), createLessonStringFromDay(weeks[i])[1], true);
                 wday ++;
             }
         }
