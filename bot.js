@@ -21,7 +21,9 @@ const WEEKDAYS = [
     "tuesday",
     "wednesday",
     "thursday",
-    "friday"
+    "friday",
+    "saturday",
+    "sunday"
 ];
 
 /* Color codes of departments */
@@ -99,11 +101,21 @@ function createLessonStringFromDay(day) {
                 teacherText += '~~';
             }
 
+            // Make tests bold
+            if (day[i][j].state == "EXAM") {
+                lessonText += '**';
+            }
+
             // lesson name
             lessonText += day[i][j].name.replace('/', '');
 
             for (k = 0; k < day[i][j].teachers.length; ++ k) {
                 teacherText += day[i][j].teachers[k] + (k+1 < day[i][j].teachers.length ? '/' : '');
+            }
+
+            // Make tests bold
+            if (day[i][j].state == "EXAM") {
+                lessonText += '**';
             }
 
             // lesson is canceled -> strikethrough
@@ -125,7 +137,8 @@ function createLessonStringFromDay(day) {
             timeText += '\n';
             timeText += day[i][0].endTime.toString().splice(day[i][0].endTime.toString().length - 2, 0, ':');
             timeText += ' - ';
-            timeText += day[parseInt(i)+1][0].startTime.toString().splice(day[parseInt(i)+1][0].startTime.toString().length - 2, 0, ':');
+            let next = day[parseInt(i)+1][0].startTime.toString();
+            timeText += next.splice(next.toString().length - 2, 0, ':');
         }
 
         lessonText += '\n';
@@ -165,20 +178,20 @@ function loadSettings() {
         if (err) return;
         let data = JSON.parse(json);
         for (i in data) {
-            loadServerSettings(i, data[i]);
+            loadServerSettings(i, data[i], undefined, false);
         }
     });
 }
 
 /* loads server setting from server id */
-function loadServerSettings(id, name, message) {
+function loadServerSettings(id, name, message, store) {
     Webuntis.findSchool(name).then(schools => { // search for HTL-Hollabrunn
         if (schools.length == 0) {
             if (message != undefined) message.reply("No school found!");
         } else {
             Webuntis.setupCookie(schools[0]).then(school => { // setup cookie -> set schoolname
                 SCHOOLS[id] = { 
-                    name: school.displayName, 
+                    name: name, 
                     classes: [] 
                 }; // empty classes
 
@@ -186,7 +199,7 @@ function loadServerSettings(id, name, message) {
                     message.reply(`Set school to ${schools[0].displayName}`);
                 }
 
-                saveSettings(); // save setting
+                if (store) saveSettings(); // save setting
 
                 Webuntis.findDepartments(school).then(departments => { // search departments of school
                     if (departments != null) {
@@ -206,6 +219,12 @@ function loadServerSettings(id, name, message) {
     });
 }
 
+/* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
+function convertDate(dateString) {
+    var date = new Date(dateString);
+    return date.getDate()+"."+(date.getMonth() + 1)+"."+date.getFullYear();
+}
+
 const client = new Discord.Client();
 
 client.on("message", function(message) {
@@ -214,7 +233,7 @@ client.on("message", function(message) {
 
     let args = message.content.slice(config.PREFIX.length).trimStart().split(' ');
     let id = message.guild == undefined ? message.author.id : message.guild.id;
-    let hasPerm = message.member.hasPermission('ADMINISTRATOR');
+    let hasPerm = /*true;*/message.member == null || message.member.hasPermission('ADMINISTRATOR');
 
     if (args[0].toLowerCase() == "help") {
         message.channel.send(new Discord.MessageEmbed()
@@ -227,6 +246,7 @@ client.on("message", function(message) {
             .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, true)
             .addField("Yesterday's Schedule", `${config.PREFIX} <class> yesterday`, true)
             .addField("Weekday's Schedule", `${config.PREFIX} <class> <weekday>`, true)
+            .setFooter("Strikethrough: Lesson is canceled\nBold: Exam")
         );
         return;
     }
@@ -234,10 +254,10 @@ client.on("message", function(message) {
     if (args[0].toLowerCase() == "set") {
         if (args.length <= 1) {
             message.reply("Missing school argument!");
-        } else if (message.member != null && !hasPerm) {
+        } else if (!hasPerm) {
             message.reply("You are not administrator!");
         } else {
-            loadServerSettings(id, args.slice(1, args.length).join(' '), message);
+            loadServerSettings(id, args.slice(1, args.length).join(' '), message, true);
         }
         return;
     }
@@ -258,21 +278,23 @@ client.on("message", function(message) {
 
         // Lessons sorted into 5 days (list of 5)
         let weeks = Webuntis.mapTimetableToWeek(timetable);
-        let wday = 0;
 
         // Create new embed
         const embed = new Discord.MessageEmbed()
             .setColor(clazz.section.name == undefined ? "#f36f24" : DEPARTMENT_COLOR[clazz.section.name])
-            .setTitle(clazz.name)
-            .setDescription(clazz.section.name == undefined ? clazz.section.displayName : clazz.section.name);
+            .setDescription(clazz.section.name == undefined ? clazz.section.displayName : clazz.section.name)
+            .setTitle(clazz.name);
 
         if (clazz.section.name != undefined) {
             embed.setThumbnail("https://www.htl-hl.ac.at/web/fileadmin/_processed_/f/3/csm_HTL_Logo_fin_RGB_weiss_037fb886bf.png"); // htl logo
         }
 
+        let date = null;
+        let wday = 0;
+
         // Show today's schedule
         if (today || tomorrow || yesterday || weekday) {
-            let date = new Date();
+            date = new Date();
 
             if (tomorrow) {
                 date.setDate(date.getDate()+1);
@@ -286,6 +308,8 @@ client.on("message", function(message) {
                 date.setDate(date.getDate()-date.getDay()+WEEKDAYS.indexOf(args[1].toLowerCase())+1);
             }
 
+            wday = date.getDay() - 1 >= 0 ? date.getDay() - 1 : 6;
+
             let fmdate = Webuntis.fmDate(date, '');
 
             if (weeks[fmdate] != undefined) {
@@ -294,16 +318,27 @@ client.on("message", function(message) {
                 embed.addField("Lessons", lesson[1], true);
                 embed.addField("Teachers", lesson[2], true);
             } else {
-                embed.addField("No class " + (tomorrow ? "tomorrow" : yesterday ? "yesterday" : "today"), ".", true);
+                embed.addField(
+                    "No class " + (tomorrow ? "tomorrow" : yesterday ? "yesterday" : weekday ? capitalizeFirstLetter(WEEKDAYS[wday]) : "today"), 
+                    ".", true
+                );
             }
         } else { // show timetable
             for (i in weeks) {
-                embed.addField(capitalizeFirstLetter(WEEKDAYS[wday]), createLessonStringFromDay(weeks[i])[1], true);
+                embed.addField(
+                    capitalizeFirstLetter(WEEKDAYS[wday]), 
+                    createLessonStringFromDay(weeks[i])[1],
+                    true
+                );
                 wday ++;
             }
         }
 
-        message.channel.send(embed.setTimestamp());
+        if (date != null) {
+            embed.setFooter(capitalizeFirstLetter(WEEKDAYS[wday]) + ", " + convertDate(date));
+        }
+
+        message.channel.send(embed);
     });
 });
 
@@ -318,5 +353,8 @@ setInterval(function() {
     }
 }, 1000 * 30); // Change every 30s
 
+console.log("Start bot.");
 loadSettings();
+console.log("Loaded stored data.");
 client.login(config.BOT_TOKEN);
+console.log("Loged into discord.");
