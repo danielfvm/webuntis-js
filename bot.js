@@ -12,6 +12,7 @@ process.env.TZ = "Europe/Vienna";
 const Webuntis = require("./webuntis.js");
 const Discord = require('discord.js');
 const config = require("./config.json");
+const fs = require('fs');
 
 
 /* Week day names */
@@ -36,15 +37,21 @@ const DEPARTMENT_COLOR = {
 };
 
 /* All classes from all departments are stored here */
-let classes = [];
+let SCHOOLS = {};
 
 /* Returns first class matching provided name */
-function getClassByName(name) {
+function getClassByName(school, name) {
+    if (SCHOOLS[school] == undefined) {
+        return null;
+    }
+
+    let classes = SCHOOLS[school].classes;
     for (i in classes) {
         if (classes[i].name.toLowerCase().includes(name.trim().toLowerCase())) {
             return classes[i];
         }
     }
+    return null;
 }
 
 function capitalizeFirstLetter(string) {
@@ -93,7 +100,7 @@ function createLessonStringFromDay(day) {
             }
 
             // lesson name
-            lessonText += day[i][j].name;
+            lessonText += day[i][j].name.replace('/', '');
 
             for (k = 0; k < day[i][j].teachers.length; ++ k) {
                 teacherText += day[i][j].teachers[k] + (k+1 < day[i][j].teachers.length ? '/' : '');
@@ -137,39 +144,101 @@ function timeNow() {
     return h + ':' + m;
 }
 
+/* stores server settings to json file */
+function saveSettings() {
+    let data = {};
 
-/* Fetches all classes in school */
-Webuntis.findSchool("HTL Hollabrunn").then(schools => { // search for HTL-Hollabrunn
-    Webuntis.setupCookie(schools[1]).then(school => { // setup cookie -> set schoolname
-        Webuntis.findDepartments(school).then(departments => { // search departments of school
-            for (i in departments) {
-                Webuntis.findClasses(departments[i]).then(list => { // search classes of department
-                    classes = classes.concat(list); // add class to list
-                });
-            }
-        });
+    for (i in SCHOOLS) {
+        data[i] = SCHOOLS[i].name; // simplify data
+    }
+
+    try {
+        fs.writeFileSync("data.json", JSON.stringify(data))
+    } catch (err) {
+        console.error(err)
+    }
+}
+
+/* loads server settings form json file */
+function loadSettings() {
+    fs.readFile('data.json', (err, json) => {
+        if (err) return;
+        let data = JSON.parse(json);
+        for (i in data) {
+            loadServerSettings(i, data[i]);
+        }
     });
-});
+}
+
+/* loads server setting from server id */
+function loadServerSettings(id, name, message) {
+    Webuntis.findSchool(name).then(schools => { // search for HTL-Hollabrunn
+        if (schools.length == 0) {
+            if (message != undefined) message.reply("No school found!");
+        } else {
+            Webuntis.setupCookie(schools[0]).then(school => { // setup cookie -> set schoolname
+                SCHOOLS[id] = { 
+                    name: school.displayName, 
+                    classes: [] 
+                }; // empty classes
+
+                if (message != undefined) {
+                    message.reply(`Set school to ${schools[0].displayName}`);
+                }
+
+                saveSettings(); // save setting
+
+                Webuntis.findDepartments(school).then(departments => { // search departments of school
+                    if (departments != null) {
+                        for (i in departments) {
+                            Webuntis.findClasses(departments[i]).then(list => { // search classes of department
+                                SCHOOLS[id].classes = SCHOOLS[id].classes.concat(list);
+                            });
+                        }
+                    } else {
+                        Webuntis.findClasses(school).then(list => { // search classes in school
+                            SCHOOLS[id].classes = list;
+                        });
+                    }
+                });
+            });
+        }
+    });
+}
 
 const client = new Discord.Client();
 
-client.on("message", function(message) { 
+client.on("message", function(message) {
     if (message.author.bot) return;
     if (!message.content.startsWith(config.PREFIX)) return;
 
     let args = message.content.slice(config.PREFIX.length).trimStart().split(' ');
+    let id = message.guild == undefined ? message.author.id : message.guild.id;
+    let hasPerm = message.member.hasPermission('ADMINISTRATOR');
 
     if (args[0].toLowerCase() == "help") {
         message.channel.send(new Discord.MessageEmbed()
             .setColor("#f36f24")
             .setTitle("Help page")
             .setDescription("A list of commands for the Webuntis Bot. For more infos, changelog or if you want to add this bot to your server go [here](https://github.com/danielfvm/webuntis-js).")
-            .addField("Timetable", `${config.PREFIX} <class>`, false)
-            .addField("Today's Schedule", `${config.PREFIX} <class> today`, false)
-            .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, false)
-            .addField("Yesterday's Schedule", `${config.PREFIX} <class> yesterday`, false)
-            .addField("Weekday's Schedule", `${config.PREFIX} <class> weekday`, false)
+            .addField(hasPerm ? "Set school" : "~~Set school~~", `${config.PREFIX} set <school>`, true)
+            .addField("Timetable", `${config.PREFIX} <class>`, true)
+            .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
+            .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, true)
+            .addField("Yesterday's Schedule", `${config.PREFIX} <class> yesterday`, true)
+            .addField("Weekday's Schedule", `${config.PREFIX} <class> <weekday>`, true)
         );
+        return;
+    }
+
+    if (args[0].toLowerCase() == "set") {
+        if (args.length <= 1) {
+            message.reply("Missing school argument!");
+        } else if (message.member != null && !hasPerm) {
+            message.reply("You are not administrator!");
+        } else {
+            loadServerSettings(id, args.slice(1, args.length).join(' '), message);
+        }
         return;
     }
 
@@ -177,10 +246,10 @@ client.on("message", function(message) {
     let tomorrow = args.includes("tomorrow");
     let yesterday = args.includes("yesterday");
     let weekday = args.length > 1 ? WEEKDAYS.includes(args[1].toLowerCase()) : false;
-    let clazz = getClassByName(args[0]);
+    let clazz = getClassByName(id, args[0]);
 
     // Error, class not found
-    if (clazz == undefined) {
+    if (clazz == null) {
         message.reply("I think your class doesnt exist.");
         return;
     }
@@ -193,10 +262,13 @@ client.on("message", function(message) {
 
         // Create new embed
         const embed = new Discord.MessageEmbed()
-            .setColor(DEPARTMENT_COLOR[clazz.department.name])
+            .setColor(clazz.section.name == undefined ? "#f36f24" : DEPARTMENT_COLOR[clazz.section.name])
             .setTitle(clazz.name)
-            .setDescription(clazz.department.name)
-            .setThumbnail("https://www.htl-hl.ac.at/web/fileadmin/_processed_/f/3/csm_HTL_Logo_fin_RGB_weiss_037fb886bf.png"); // htl logo
+            .setDescription(clazz.section.name == undefined ? clazz.section.displayName : clazz.section.name);
+
+        if (clazz.section.name != undefined) {
+            embed.setThumbnail("https://www.htl-hl.ac.at/web/fileadmin/_processed_/f/3/csm_HTL_Logo_fin_RGB_weiss_037fb886bf.png"); // htl logo
+        }
 
         // Show today's schedule
         if (today || tomorrow || yesterday || weekday) {
@@ -246,4 +318,5 @@ setInterval(function() {
     }
 }, 1000 * 30); // Change every 30s
 
+loadSettings();
 client.login(config.BOT_TOKEN);

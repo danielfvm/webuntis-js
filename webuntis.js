@@ -26,7 +26,8 @@ const Webuntis = {
                 data,
                 'POST',
             ).then(res => {
-                resolve(JSON.parse(res.content)["result"]["schools"]);
+                let result = JSON.parse(res.content);
+                resolve(result["result"] == undefined ? [] : result["result"]["schools"]);
             }, err => reject(err));
         });
     },
@@ -56,31 +57,40 @@ const Webuntis = {
                 'GET',
                 school.cookie
             ).then(res => {
-                let departments = JSON.parse(res.content).data.filters[0].elements;
+                let result = JSON.parse(res.content).data.filters;
 
-                for (i in departments) {
-                    departments[i].school = school;
+                if (result.length > 0) {
+                    let departments = result[0].elements;
+
+                    for (i in departments) {
+                        departments[i].school = school;
+                    }
+
+                    resolve(departments);
+                } else {
+                    resolve(null);
                 }
-
-                resolve(departments);
             }, err => reject(err));
         });
     },
 
-    /* Returns a list of classes in department */
-    findClasses: function(department) {
+    /* Returns a list of classes in department/school */
+    findClasses: function(section) {
+        let isDepartment = section.school != undefined;
+        let school = isDepartment ? section.school : section; // section could be school or department
+
         return new Promise(function(resolve, reject) {
             Webuntis.request(
-                department.school.server, 
-                `/WebUntis/api/public/timetable/weekly/pageconfig?type=1&filter.departmentId=${department.id}`, 
+                school.server, 
+                `/WebUntis/api/public/timetable/weekly/pageconfig?type=1${ isDepartment ? `&filter.departmentId=${section.id}` : '' }`, 
                 '', 
                 'GET',
-                department.school.cookie
+                school.cookie
             ).then(res => {
                 let classes = JSON.parse(res.content).data.elements;
 
                 for (i in classes) {
-                    classes[i].department = department;
+                    classes[i].section = section;
                 }
 
                 resolve(classes);
@@ -107,15 +117,17 @@ const Webuntis = {
 
     /* Returns timetable of class */
     getTimetable: function(clazz) {
+        let isDepartment = clazz.section.school != undefined;
+        let school = isDepartment ? clazz.section.school : clazz.section;
         let date = Webuntis.fmDate(new Date());
 
         return new Promise(function(resolve, reject) {
             Webuntis.request(
-                clazz.department.school.server, 
-                `/WebUntis/api/public/timetable/weekly/data?type=1&date=${date}&elementType=1&elementId=${clazz.id}&filter.departmentId=${clazz.department.id}`, 
+                school.server, 
+                `/WebUntis/api/public/timetable/weekly/data?type=1&date=${date}&elementType=1&elementId=${clazz.id}${ isDepartment ? `&filter.departmentId=${clazz.section.id}` : '' }`,
                 '', 
                 'GET',
-                clazz.department.school.cookie
+                school.cookie
             ).then(res => {
                 resolve(JSON.parse(res.content).data.result.data);
             }, err => reject(err));
