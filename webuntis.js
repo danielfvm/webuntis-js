@@ -119,12 +119,19 @@ const Webuntis = {
     getTimetable: function(clazz) {
         let isDepartment = clazz.section.school != undefined;
         let school = isDepartment ? clazz.section.school : clazz.section;
-        let date = Webuntis.fmDate(new Date());
+
+        let date = new Date();
+
+        if (date.getDay() == 0) { // if sunday, set to next week
+            date.setDate(date.getDate() + 1);
+        }
+
+        let fmdate = Webuntis.fmDate(date);
 
         return new Promise(function(resolve, reject) {
             Webuntis.request(
                 school.server, 
-                `/WebUntis/api/public/timetable/weekly/data?type=1&date=${date}&elementType=1&elementId=${clazz.id}${ isDepartment ? `&filter.departmentId=${clazz.section.id}` : '' }`,
+                `/WebUntis/api/public/timetable/weekly/data?type=1&date=${fmdate}&elementType=1&elementId=${clazz.id}${ isDepartment ? `&filter.departmentId=${clazz.section.id}` : '' }`,
                 '', 
                 'GET',
                 school.cookie
