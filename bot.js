@@ -232,6 +232,21 @@ function loadServerSettings(id, name, message, store) {
     });
 }
 
+function getMenu() {
+    let date = new Date();
+    let wday = date.getWeek();
+    let month = date.getMonth() + 1;
+    let year = date.getFullYear();
+
+    if (month < 2) {
+        month = '0' + month;
+    }
+
+    return new Discord.MessageEmbed()
+        .setTitle('Menu')
+        .setImage(`http://www.sth-hollabrunn.at/wp-content/uploads/${year}/${month}/MENÜPLAN-HOLLABRUNN-${year}-KW-${wday}-1030x729.jpg`);
+}
+
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
 function convertDate(dateString) {
     var date = new Date(dateString);
@@ -246,7 +261,7 @@ client.on("message", function(message) {
 
     let args = message.content.slice(config.PREFIX.length).trimStart().split(' ');
     let id = message.guild == undefined ? message.author.id : message.guild.id;
-    let hasPerm = /*true;*/message.member == null || message.member.hasPermission('ADMINISTRATOR');
+    let hasPerm = message.member == null || message.member.hasPermission('ADMINISTRATOR');
 
     if (args[0].toLowerCase() == "help") {
         message.channel.send(new Discord.MessageEmbed()
@@ -277,19 +292,7 @@ client.on("message", function(message) {
     }
 
     if (args[0].toLowerCase() == "menu") {
-        let date = new Date();
-        let wday = date.getWeek();
-        let month = date.getMonth() + 1;
-        let year = date.getFullYear();
-
-        if (month < 2) {
-            month = '0' + month;
-        }
-
-        message.channel.send(new Discord.MessageEmbed()
-            .setTitle('Menu')
-            .setImage(`http://www.sth-hollabrunn.at/wp-content/uploads/${year}/${month}/MENÜPLAN-HOLLABRUNN-${year}-KW-${wday}-1030x729.jpg`)
-        );
+        message.channel.send(getMenu());
         return;
     }
 
@@ -373,16 +376,32 @@ client.on("message", function(message) {
     });
 });
 
-/* Set bot status message */
-let msg = false;
-setInterval(function() {
-    msg = !msg;
-    if (msg) {
-        client.user.setActivity(timeNow(), { type: "PLAYING" });
-    } else {
-        client.user.setActivity(`${config.PREFIX} help`, { type: "PLAYING" });
-    }
-}, 1000 * 30); // Change every 30s
+client.on("ready", () => {
+    const menuChannel = client.channels.cache.get("763020692861485076"); 
+    if (!menuChannel) return console.error("Couldn't find the channel.");
+
+    setInterval(function() {
+        let date = new Date();
+        if (date.getDay() == 1 && date.getHours() == 6) {
+            menuChannel.send(getMenu()).catch(e => console.log(e));
+        }
+    }, 1000 * 60 * 60); // Tick every hour
+
+    /* Set bot status message */
+    let msg = false;
+    setInterval(function() {
+        msg = !msg;
+        if (msg) {
+            client.user.setActivity(timeNow(), { type: "PLAYING" });
+        } else {
+            client.user.setActivity(`${config.PREFIX} help`, { type: "PLAYING" });
+        }
+
+
+    }, 1000 * 30); // Change every 30s
+});
+
+
 
 console.log("Start bot.");
 loadSettings();
