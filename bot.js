@@ -60,6 +60,19 @@ function capitalizeFirstLetter(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+/* Original: https://weeknumber.net/how-to/javascript */
+Date.prototype.getWeek = function() {
+    var date = new Date(this.getTime());
+    date.setHours(0, 0, 0, 0);
+    // Thursday in current week decides the year.
+    date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+    // January 4 is always in week 1.
+    var week1 = new Date(date.getFullYear(), 0, 4);
+    // Adjust to Thursday in week 1 and count number of weeks from date to week1.
+    return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+
+
 /* Original: https://stackoverflow.com/questions/4313841/insert-a-string-at-a-specific-index */
 if (!String.prototype.splice) {
     /**
@@ -219,6 +232,21 @@ function loadServerSettings(id, name, message, store) {
     });
 }
 
+function getMenu() {
+    let date = new Date();
+    let wday = date.getWeek();
+    let month = date.getMonth() + 1;
+    let year = date.getFullYear();
+
+    if (month < 2) {
+        month = '0' + month;
+    }
+
+    return new Discord.MessageEmbed()
+        .setTitle('Menu')
+        .setImage(`http://www.sth-hollabrunn.at/wp-content/uploads/${year}/${month}/MENÜPLAN-HOLLABRUNN-${year}-KW-${wday}-1030x729.jpg`);
+}
+
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
 function convertDate(dateString) {
     var date = new Date(dateString);
@@ -233,7 +261,7 @@ client.on("message", function(message) {
 
     let args = message.content.slice(config.PREFIX.length).trimStart().split(' ');
     let id = message.guild == undefined ? message.author.id : message.guild.id;
-    let hasPerm = /*true;*/message.member == null || message.member.hasPermission('ADMINISTRATOR');
+    let hasPerm = message.member == null || message.member.hasPermission('ADMINISTRATOR');
 
     if (args[0].toLowerCase() == "help") {
         message.channel.send(new Discord.MessageEmbed()
@@ -241,6 +269,7 @@ client.on("message", function(message) {
             .setTitle("Help page")
             .setDescription("A list of commands for the Webuntis Bot. For more infos, changelog or if you want to add this bot to your server go [here](https://github.com/danielfvm/webuntis-js).")
             .addField(hasPerm ? "Set school" : "~~Set school~~", `${config.PREFIX} set <school>`, true)
+            .addField("Menu", `${config.PREFIX} menu`, true)
             .addField("Timetable", `${config.PREFIX} <class>`, true)
             .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
             .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, true)
@@ -259,6 +288,11 @@ client.on("message", function(message) {
         } else {
             loadServerSettings(id, args.slice(1, args.length).join(' '), message, true);
         }
+        return;
+    }
+
+    if (args[0].toLowerCase() == "menu") {
+        message.channel.send(getMenu());
         return;
     }
 
@@ -342,16 +376,32 @@ client.on("message", function(message) {
     });
 });
 
-/* Set bot status message */
-let msg = false;
-setInterval(function() {
-    msg = !msg;
-    if (msg) {
-        client.user.setActivity(timeNow(), { type: "PLAYING" });
-    } else {
-        client.user.setActivity(`${config.PREFIX} help`, { type: "PLAYING" });
-    }
-}, 1000 * 30); // Change every 30s
+client.on("ready", () => {
+    const menuChannel = client.channels.cache.get("763020692861485076"); 
+    if (!menuChannel) return console.error("Couldn't find the channel.");
+
+    setInterval(function() {
+        let date = new Date();
+        if (date.getDay() == 1 && date.getHours() == 6) {
+            menuChannel.send(getMenu()).catch(e => console.log(e));
+        }
+    }, 1000 * 60 * 60); // Tick every hour
+
+    /* Set bot status message */
+    let msg = false;
+    setInterval(function() {
+        msg = !msg;
+        if (msg) {
+            client.user.setActivity(timeNow(), { type: "PLAYING" });
+        } else {
+            client.user.setActivity(`${config.PREFIX} help`, { type: "PLAYING" });
+        }
+
+
+    }, 1000 * 30); // Change every 30s
+});
+
+
 
 console.log("Start bot.");
 loadSettings();
