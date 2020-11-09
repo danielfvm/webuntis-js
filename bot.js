@@ -244,7 +244,7 @@ function getMenu() {
 
     return new Discord.MessageEmbed()
         .setTitle('Menu')
-        .setImage(`http://www.sth-hollabrunn.at/wp-content/uploads/${year}/${month}/MENÜPLAN-HOLLABRUNN-${year}-KW-${wday}-1030x729.jpg`);
+        .setImage(`http://www.sth-hollabrunn.at/wp-content/uploads/${year}/${month}/MENÜPLAN-HOLLABRUNN-${year}-KW-${wday}.jpg`);
 }
 
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
