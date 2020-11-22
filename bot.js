@@ -14,6 +14,8 @@ const Discord = require('discord.js');
 const config = require("./config.json");
 const fs = require('fs');
 
+var XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+
 
 /* Week day names */
 const WEEKDAYS = [
@@ -233,36 +235,88 @@ function loadServerSettings(id, name, message, store) {
 }
 
 function getMenu() {
-    let date = new Date();
-    let wday = date.getWeek();
-    let month = date.getMonth() + 1;
-    let year = date.getFullYear();
+    let req = new XMLHttpRequest();
+    req.open("GET", "http://www.sth-hollabrunn.at/", false);
+    req.send(null);
 
-    if (month < 2) {
-        month = '0' + month;
+    /* Response from webpage */
+    if (req.status == 200) {
+
+        let n = req.responseText.search("Speiseplan");
+
+        /* pdf key not found in html */
+        if (n == -1) {
+            console.log("Failed to fetch menu img.");
+            return new Discord.MessageEmbed()
+                .setTitle("Menu")
+                .addField("No menu found!", "-", true);
+        }
+
+        let url = req.responseText.substring(n);
+
+        let nimg = url.search(`<img class='avia_image`);
+
+        /* avia_image key not found in html */
+        if (nimg == -1) {
+            console.log("Failed to fetch menu img.");
+            return new Discord.MessageEmbed()
+                .setTitle("Menu")
+                .addField("No menu found!", "-", true);
+        }
+
+        /* fetch url of image */
+        let urlimg = url.substring(nimg + 30);
+        urlimg = urlimg.substring(0, urlimg.search(`'`));
+
+        let npdf = url.search(`<a href='`);
+
+        /* avia_image key not found in html */
+        if (npdf == -1) {
+            console.log("Failed to fetch menu pdf.");
+            return new Discord.MessageEmbed()
+                .setTitle("Menu")
+                .addField("No menu found!", "-", true);
+        }
+
+        /* fetch url of pdf */
+        let urlpdf = url.substring(npdf + 9);
+        urlpdf = urlpdf.substring(0, urlpdf.search(`'`));
+
+        return {
+            embed: new Discord.MessageEmbed()
+                .setTitle("Menu")
+                .setImage(urlimg),
+            files: [{
+                attachment: urlpdf,
+                name: 'menu.pdf'
+            }]
+        };
     }
 
+    /* Error connecting */
+    console.log("Failed to fetch menu img.");
     return new Discord.MessageEmbed()
-        .setTitle('Menu')
-        .setImage(`http://www.sth-hollabrunn.at/wp-content/uploads/${year}/${month}/MENÜPLAN-HOLLABRUNN-${year}-KW-${wday}.jpg`);
+        .setTitle("Menu")
+        .addField("No menu found!", "-", true);
 }
 
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
 function convertDate(dateString) {
     var date = new Date(dateString);
-    return date.getDate()+"."+(date.getMonth() + 1)+"."+date.getFullYear();
+    return `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
 }
 
 const client = new Discord.Client();
 
 client.on("message", function(message) {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(config.PREFIX)) return;
+    if (message.author.bot) return; // skip if message is from bot
+    if (!message.content.startsWith(config.PREFIX)) return; // skip if message doesnt start with prefix
 
-    let args = message.content.slice(config.PREFIX.length).trimStart().split(' ');
-    let id = message.guild == undefined ? message.author.id : message.guild.id;
-    let hasPerm = message.member == null || message.member.hasPermission('ADMINISTRATOR');
+    let args = message.content.slice(config.PREFIX.length).trimStart().split(' '); // command args
+    let id = message.guild == undefined ? message.author.id : message.guild.id; // get message id
+    let hasPerm = message.member == null || message.member.hasPermission('ADMINISTRATOR'); // check if author has permissions
 
+    /* Get help */
     if (args[0].toLowerCase() == "help") {
         message.channel.send(new Discord.MessageEmbed()
             .setColor("#f36f24")
@@ -280,6 +334,7 @@ client.on("message", function(message) {
         return;
     }
 
+    /* Set School via command */
     if (args[0].toLowerCase() == "set") {
         if (args.length <= 1) {
             message.reply("Missing school argument!");
@@ -291,11 +346,13 @@ client.on("message", function(message) {
         return;
     }
 
+    /* Get menu from htl sth */
     if (args[0].toLowerCase() == "menu") {
         message.channel.send(getMenu());
         return;
     }
 
+    /* Get class */
     let today = args.includes("today");
     let tomorrow = args.includes("tomorrow");
     let yesterday = args.includes("yesterday");
@@ -357,7 +414,7 @@ client.on("message", function(message) {
                     ".", true
                 );
             }
-        } else { // show timetable
+        } else { // show timetable for whole week
             for (i in weeks) {
                 embed.addField(
                     capitalizeFirstLetter(WEEKDAYS[wday]), 
