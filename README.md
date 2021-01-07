@@ -30,6 +30,7 @@ node bot.js
 ```
 
 ## Changelog
+* Fixed wrong day title
 * Added multi school support
 * Added bold text for exams
 * Added date to footer

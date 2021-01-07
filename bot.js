@@ -3,18 +3,15 @@
     Github: https://github.com/danielfvm
     Date:   2.10.2020
 
-    A Discord Bot for Webuntis
+    A discord bot for webuntis
 */
-
-/* Set timezone to vienna */
-process.env.TZ = "Europe/Vienna";
 
 const Webuntis = require("./webuntis.js");
 const Discord = require('discord.js');
 const config = require("./config.json");
 const fs = require('fs');
 
-var XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
 
 /* Week day names */
@@ -27,6 +24,15 @@ const WEEKDAYS = [
     "saturday",
     "sunday"
 ];
+
+/* 
+ * The array WEEKDAYS and the return value of Date().getDay() are different and 
+ * has to be converted to be used as an index in WEEKDAYS
+ */
+function mapToWeekDaysList(day) {
+    return day - 1 >= 0 ? day - 1 : 6;
+}
+
 
 /* Color codes of departments */
 const DEPARTMENT_COLOR = {
@@ -41,7 +47,7 @@ const DEPARTMENT_COLOR = {
 };
 
 /* All classes from all departments are stored here */
-let SCHOOLS = {};
+const SCHOOLS = {};
 
 /* Returns first class matching provided name */
 function getClassByName(school, name) {
@@ -49,13 +55,9 @@ function getClassByName(school, name) {
         return null;
     }
 
-    let classes = SCHOOLS[school].classes;
-    for (i in classes) {
-        if (classes[i].name.toLowerCase().includes(name.trim().toLowerCase())) {
-            return classes[i];
-        }
-    }
-    return null;
+    return SCHOOLS[school].classes.find( c => 
+        c.name.toLowerCase().includes(name.trim().toLowerCase())
+    );
 }
 
 function capitalizeFirstLetter(string) {
@@ -64,35 +66,18 @@ function capitalizeFirstLetter(string) {
 
 /* Original: https://weeknumber.net/how-to/javascript */
 Date.prototype.getWeek = function() {
-    var date = new Date(this.getTime());
+    let date = new Date(this.getTime());
     date.setHours(0, 0, 0, 0);
-    // Thursday in current week decides the year.
     date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-    // January 4 is always in week 1.
-    var week1 = new Date(date.getFullYear(), 0, 4);
-    // Adjust to Thursday in week 1 and count number of weeks from date to week1.
+    let week1 = new Date(date.getFullYear(), 0, 4);
     return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
 }
 
 
 /* Original: https://stackoverflow.com/questions/4313841/insert-a-string-at-a-specific-index */
-if (!String.prototype.splice) {
-    /**
-     * {JSDoc}
-     *
-     * The splice() method changes the content of a string by removing a range of
-     * characters and/or adding new characters.
-     *
-     * @this {String}
-     * @param {number} start Index at which to start changing the string.
-     * @param {number} delCount An integer indicating the number of old chars to remove.
-     * @param {string} newSubStr The String that is spliced in.
-     * @return {string} A new string with the spliced substring.
-     */
-    String.prototype.splice = function(start, delCount, newSubStr) {
-        return this.slice(0, start) + newSubStr + this.slice(start + Math.abs(delCount));
-    };
-}
+String.prototype.splice = function(start, delCount, newSubStr) {
+    return this.slice(0, start) + newSubStr + this.slice(start + Math.abs(delCount));
+};
 
 /* Creates lesson string for day */
 function createLessonStringFromDay(day) {
@@ -166,7 +151,7 @@ function createLessonStringFromDay(day) {
 
 /* original: https://stackoverflow.com/questions/10599148/how-do-i-get-the-current-time-only-in-javascript */
 function timeNow() {
-    var d = new Date(),
+    let d = new Date(),
     h = (d.getHours()<10?'0':'') + d.getHours(),
     m = (d.getMinutes()<10?'0':'') + d.getMinutes();
     return h + ':' + m;
@@ -174,11 +159,7 @@ function timeNow() {
 
 /* stores server settings to json file */
 function saveSettings() {
-    let data = {};
-
-    for (i in SCHOOLS) {
-        data[i] = SCHOOLS[i].name; // simplify data
-    }
+    let data = SCHOOLS.map(x => x.name); // simplify data
 
     try {
         fs.writeFileSync("data.json", JSON.stringify(data))
@@ -192,8 +173,9 @@ function loadSettings() {
     fs.readFile('data.json', (err, json) => {
         if (err) return;
         let data = JSON.parse(json);
-        for (i in data) {
-            loadServerSettings(i, data[i], undefined, false);
+        for (serverId in data) {
+            console.log(`Loading setting for server '${serverId}'`);
+            loadServerSettings(serverId, data[serverId], undefined, false);
         }
     });
 }
@@ -234,76 +216,19 @@ function loadServerSettings(id, name, message, store) {
     });
 }
 
-function getMenu() {
-    let req = new XMLHttpRequest();
-    req.open("GET", "http://www.sth-hollabrunn.at/", false);
-    req.send(null);
-
-    /* Response from webpage */
-    if (req.status == 200) {
-
-        let n = req.responseText.search("Speiseplan");
-
-        /* pdf key not found in html */
-        if (n == -1) {
-            console.log("Failed to fetch menu img.");
-            return new Discord.MessageEmbed()
-                .setTitle("Menu")
-                .addField("No menu found!", "-", true);
-        }
-
-        let url = req.responseText.substring(n);
-
-        let nimg = url.search(`<img class='avia_image`);
-
-        /* avia_image key not found in html */
-        if (nimg == -1) {
-            console.log("Failed to fetch menu img.");
-            return new Discord.MessageEmbed()
-                .setTitle("Menu")
-                .addField("No menu found!", "-", true);
-        }
-
-        /* fetch url of image */
-        let urlimg = url.substring(nimg + 30);
-        urlimg = urlimg.substring(0, urlimg.search(`'`));
-
-        let npdf = url.search(`<a href='`);
-
-        /* avia_image key not found in html */
-        if (npdf == -1) {
-            console.log("Failed to fetch menu pdf.");
-            return new Discord.MessageEmbed()
-                .setTitle("Menu")
-                .addField("No menu found!", "-", true);
-        }
-
-        /* fetch url of pdf */
-        let urlpdf = url.substring(npdf + 9);
-        urlpdf = urlpdf.substring(0, urlpdf.search(`'`));
-
-        return {
-            embed: new Discord.MessageEmbed()
-                .setTitle("Menu")
-                .setImage(urlimg),
-            files: [{
-                attachment: urlpdf,
-                name: 'menu.pdf'
-            }]
-        };
-    }
-
-    /* Error connecting */
-    console.log("Failed to fetch menu img.");
-    return new Discord.MessageEmbed()
-        .setTitle("Menu")
-        .addField("No menu found!", "-", true);
-}
-
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
 function convertDate(dateString) {
-    var date = new Date(dateString);
+    let date = new Date(dateString);
     return `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
+}
+
+function formatIntToDate(intDate) {
+    let strDate = intDate.toString();
+    let year = strDate.substring(0, 4);
+    let month = strDate.substring(4, 6);
+    let day = strDate.substring(6, 8);
+
+    return new Date(`${year}-${month}-${day}`);
 }
 
 const client = new Discord.Client();
@@ -323,7 +248,6 @@ client.on("message", function(message) {
             .setTitle("Help page")
             .setDescription("A list of commands for the Webuntis Bot. For more infos, changelog or if you want to add this bot to your server go [here](https://github.com/danielfvm/webuntis-js).")
             .addField(hasPerm ? "Set school" : "~~Set school~~", `${config.PREFIX} set <school>`, true)
-            .addField("Menu", `${config.PREFIX} menu`, true)
             .addField("Timetable", `${config.PREFIX} <class>`, true)
             .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
             .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, true)
@@ -343,12 +267,6 @@ client.on("message", function(message) {
         } else {
             loadServerSettings(id, args.slice(1, args.length).join(' '), message, true);
         }
-        return;
-    }
-
-    /* Get menu from htl sth */
-    if (args[0].toLowerCase() == "menu") {
-        message.channel.send(getMenu());
         return;
     }
 
@@ -380,12 +298,9 @@ client.on("message", function(message) {
             embed.setThumbnail("https://www.htl-hl.ac.at/web/fileadmin/_processed_/f/3/csm_HTL_Logo_fin_RGB_weiss_037fb886bf.png"); // htl logo
         }
 
-        let date = null;
-        let wday = 0;
-
         // Show today's schedule
         if (today || tomorrow || yesterday || weekday) {
-            date = new Date();
+            let date = new Date();
 
             if (tomorrow) {
                 date.setDate(date.getDate()+1);
@@ -399,9 +314,8 @@ client.on("message", function(message) {
                 date.setDate(date.getDate()-date.getDay()+WEEKDAYS.indexOf(args[1].toLowerCase())+1);
             }
 
-            wday = date.getDay() - 1 >= 0 ? date.getDay() - 1 : 6;
-
             let fmdate = Webuntis.fmDate(date, '');
+            let wday = mapToWeekDaysList(date.getDay());
 
             if (weeks[fmdate] != undefined) {
                 let lesson = createLessonStringFromDay(weeks[fmdate]);
@@ -414,19 +328,18 @@ client.on("message", function(message) {
                     ".", true
                 );
             }
+
+            embed.setFooter(capitalizeFirstLetter(WEEKDAYS[wday]) + ", " + convertDate(date));
         } else { // show timetable for whole week
             for (i in weeks) {
-                embed.addField(
-                    capitalizeFirstLetter(WEEKDAYS[wday]), 
-                    createLessonStringFromDay(weeks[i])[1],
-                    true
-                );
-                wday ++;
-            }
-        }
+                let date = formatIntToDate(weeks[i].find((x) => x && x[0])[0].date);
+                let day = mapToWeekDaysList(date.getDay());
 
-        if (date != null) {
-            embed.setFooter(capitalizeFirstLetter(WEEKDAYS[wday]) + ", " + convertDate(date));
+                let textWeekDay = capitalizeFirstLetter(WEEKDAYS[day]);
+                let textLesson = createLessonStringFromDay(weeks[i])[1];
+
+                embed.addField(textWeekDay, textLesson, true);
+            }
         }
 
         message.channel.send(embed);
@@ -434,16 +347,6 @@ client.on("message", function(message) {
 });
 
 client.on("ready", () => {
-    const menuChannel = client.channels.cache.get("763020692861485076"); 
-    if (!menuChannel) return console.error("Couldn't find the channel.");
-
-    setInterval(function() {
-        let date = new Date();
-        if (date.getDay() == 1 && date.getHours() == 6) {
-            menuChannel.send(getMenu()).catch(e => console.log(e));
-        }
-    }, 1000 * 60 * 60); // Tick every hour
-
     /* Set bot status message */
     let msg = false;
     setInterval(function() {
@@ -453,15 +356,8 @@ client.on("ready", () => {
         } else {
             client.user.setActivity(`${config.PREFIX} help`, { type: "PLAYING" });
         }
-
-
     }, 1000 * 30); // Change every 30s
 });
 
-
-
-console.log("Start bot.");
 loadSettings();
-console.log("Loaded stored data.");
 client.login(config.BOT_TOKEN);
-console.log("Loged into discord.");
