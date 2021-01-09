@@ -15,7 +15,7 @@ If you want to invite this bot to your discord server, click [here](https://disc
 * Set school `!u set <school>`
 
 ## Installation
-If you want to build it yourself then do following:
+If you want to host it yourself then do the following:
 ```
 git clone https://github.com/danielfvm/webuntis-js
 cd webuntis-js
