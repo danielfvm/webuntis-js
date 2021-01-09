@@ -1,5 +1,6 @@
 # webuntis-js
 A JavaScript Discord Bot for [Webuntis.com](https://webuntis.com/)
+![Screenshot](https://github.com/danielfvm/webuntis-js/blob/main/res/screenshot.png?raw=true)
 
 ## Invite
 If you want to invite this Bot to your discord server, click [here](https://discord.com/api/oauth2/authorize?client_id=761504244163280906&permissions=67584&scope=bot)
