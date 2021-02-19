@@ -9,10 +9,12 @@
 const Webuntis = require("./webuntis.js");
 const Discord = require('discord.js');
 const config = require("./config.json");
+const text2wav = require('text2wav');
 const fs = require('fs');
 
 const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 
+var bot = new Discord.Client();
 
 /* Week day names */
 const WEEKDAYS = [
@@ -235,6 +237,27 @@ function formatIntToDate(intDate) {
     return new Date(`${year}-${month}-${day}`);
 }
 
+
+function playInVoiceChannel(voiceChannel, text) {
+    voiceChannel.join().then(connection => {
+        text2wav(text).then((data) => {
+            var filename = Math.random().toString(16).substr(2, 8) + ".wav";
+            fs.writeFile(filename, Buffer.from(data), (error) => {
+                if (error) {
+                    console.log(error);
+                } else {
+                    const dispatcher = connection.play(filename);
+                    dispatcher.on("end", end => {
+                        console.log("Cleanup voice file " + filename);
+                        voiceChannel.leave();
+                        fs.unlink(filename);
+                    });
+                }
+            });
+        });
+    }).catch(err => console.log(err));
+}
+
 const client = new Discord.Client();
 
 client.on("message", function(message) {
@@ -252,6 +275,7 @@ client.on("message", function(message) {
             .setTitle("Help page")
             .setDescription("A list of commands for the Webuntis Bot. For more infos, changelog or if you want to add this bot to your server go [here](https://github.com/danielfvm/webuntis-js).")
             .addField(hasPerm ? "Set school" : "~~Set school~~", `${config.PREFIX} set <school>`, true)
+            .addField("Text to voice", `${config.PREFIX} play <message>`, true)
             .addField("Timetable", `${config.PREFIX} <class>`, true)
             .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
             .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, true)
@@ -270,6 +294,16 @@ client.on("message", function(message) {
             message.reply("You are not administrator!");
         } else {
             loadServerSettings(id, args.slice(1, args.length).join(' '), message, true);
+        }
+        return;
+    }
+
+    /* Play audio in voice channel */
+    if (args[0].toLowerCase() == "play") {
+        if (message.member && message.member.voice.channel) {
+            playInVoiceChannel(message.member.voice.channel, args.slice(1).join(' '));
+        } else {
+            message.reply("Please join a voice chat first.");
         }
         return;
     }
