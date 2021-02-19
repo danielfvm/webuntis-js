@@ -4,7 +4,12 @@
   "description": "A discord bot for Webuntis",
   "main": "bot.js",
   "dependencies": {
-    "discord.js": "^12.3.1"
+    "discord.js": "^12.4.1",
+    "fs-extra": "^9.1.0",
+    "node-opus": "^0.3.3",
+    "opusscript": "0.0.7",
+    "text2wav": "0.0.13",
+    "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {},
   "scripts": {

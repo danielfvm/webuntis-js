@@ -14,6 +14,7 @@ If you want to invite this bot to your discord server, click [here](https://disc
 * Yesterday's Schedule `!u <class> yesterday`
 * Weekday's Schedule `!u <class> <weekday>`
 * Set school `!u set <school>`
+* Text to voice `!u play <message>`
 
 ## Installation
 If you want to host it yourself then do the following:
