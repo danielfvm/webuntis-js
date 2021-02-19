@@ -159,7 +159,11 @@ function timeNow() {
 
 /* stores server settings to json file */
 function saveSettings() {
-    let data = SCHOOLS.map(x => x.name); // simplify data
+    let data = {}; // simplify data
+
+    for (i in SCHOOLS) {
+        data[i] = SCHOOLS[i].name; // simplify data
+    }
 
     try {
         fs.writeFileSync("data.json", JSON.stringify(data))
