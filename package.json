@@ -8,10 +8,10 @@
     "fs-extra": "^9.1.0",
     "node-opus": "^0.3.3",
     "opusscript": "0.0.7",
+    "request": "^2.88.2",
     "text2wav": "0.0.13",
     "xmlhttprequest": "^1.8.0"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "node bot.js"
   },

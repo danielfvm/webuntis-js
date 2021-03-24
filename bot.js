@@ -1,18 +1,19 @@
 /*
-    Author: Daniel Schloegl
-    Github: https://github.com/danielfvm
-    Date:   2.10.2020
-
-    A discord bot for webuntis
+ *  Author: Daniel Schloegl
+ *  Github: https://github.com/danielfvm
+ *  Date:   24.03.2021
+ *
+ *  A discord bot for webuntis
 */
 
-const Webuntis = require("./webuntis.js");
+const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
 const Discord = require('discord.js');
-const config = require("./config.json");
 const text2wav = require('text2wav');
+const request = require("request");
 const fs = require('fs');
 
-const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+const Webuntis = require("./webuntis.js");
+const config = require("./config.json");
 
 var bot = new Discord.Client();
 
@@ -168,7 +169,7 @@ function saveSettings() {
     }
 
     try {
-        fs.writeFileSync("data.json", JSON.stringify(data))
+        fs.writeFileSync("data.json", JSON.stringify(data));
     } catch (err) {
         console.error(err)
     }
@@ -187,39 +188,47 @@ function loadSettings() {
 }
 
 /* loads server setting from server id */
-function loadServerSettings(id, name, message, store) {
-    Webuntis.findSchool(name).then(schools => { // search for HTL-Hollabrunn
-        if (schools.length == 0) {
-            if (message != undefined) message.reply("No school found!");
-        } else {
-            Webuntis.setupCookie(schools[0]).then(school => { // setup cookie -> set schoolname
-                SCHOOLS[id] = { 
-                    name: name, 
-                    classes: [] 
-                }; // empty classes
+async function loadServerSettings(id, name, message, store) {
+    let schools = await Webuntis.findSchool(name); // search for HTL-Hollabrunn
 
-                if (message != undefined) {
-                    message.reply(`Set school to ${schools[0].displayName}`);
-                }
-
-                if (store) saveSettings(); // save setting
-
-                Webuntis.findDepartments(school).then(departments => { // search departments of school
-                    if (departments != null) {
-                        for (i in departments) {
-                            Webuntis.findClasses(departments[i]).then(list => { // search classes of department
-                                SCHOOLS[id].classes = SCHOOLS[id].classes.concat(list);
-                            });
-                        }
-                    } else {
-                        Webuntis.findClasses(school).then(list => { // search classes in school
-                            SCHOOLS[id].classes = list;
-                        });
-                    }
-                });
-            });
+    // No school found
+    if (schools.length == 0) {
+        if (message != undefined) {
+            message.reply("No school found!");
         }
-    });
+        return;
+    }
+
+    // Setup cookie -> set schoolname
+    let school = await Webuntis.setupCookie(schools[0]); 
+
+    // Init with empty classes
+    SCHOOLS[id] = { 
+        name: name, 
+        classes: [] 
+    }; 
+
+    if (message != undefined) {
+        message.reply(`Set school to ${schools[0].displayName}`);
+    }
+
+    // Save setting
+    if (store) {
+        saveSettings();
+    }
+
+    // search departments of school
+    let departments = await Webuntis.findDepartments(school); 
+
+    if (departments != null) {
+        // search classes in departments
+        for (i in departments) {
+            SCHOOLS[id].classes = SCHOOLS[id].classes.concat(await Webuntis.findClasses(departments[i])); 
+        }
+    } else {
+        // search classes in school
+        SCHOOLS[id].classes = await Webuntis.findClasses(school); 
+    }
 }
 
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
@@ -237,25 +246,56 @@ function formatIntToDate(intDate) {
     return new Date(`${year}-${month}-${day}`);
 }
 
+async function playInVoiceChannel(voiceChannel, text) {
+    try {
+        let connection = await voiceChannel.join();
+        let data = await text2wav(text);
+        var filename = Math.random().toString(16).substr(2, 8) + ".wav";
 
-function playInVoiceChannel(voiceChannel, text) {
-    voiceChannel.join().then(connection => {
-        text2wav(text).then((data) => {
-            var filename = Math.random().toString(16).substr(2, 8) + ".wav";
-            fs.writeFile(filename, Buffer.from(data), (error) => {
-                if (error) {
-                    console.log(error);
-                } else {
-                    const dispatcher = connection.play(filename);
-                    dispatcher.on("end", end => {
-                        console.log("Cleanup voice file " + filename);
-                        voiceChannel.leave();
-                        fs.unlink(filename);
-                    });
-                }
-            });
+        fs.writeFile(filename, Buffer.from(data), (error) => {
+            if (error) {
+                console.log(error);
+            } else {
+                const dispatcher = connection.play(filename);
+                dispatcher.on("end", end => {
+                    console.log("Cleanup voice file " + filename);
+                    voiceChannel.leave();
+                    fs.unlink(filename);
+                });
+            }
         });
-    }).catch(err => console.log(err));
+    } catch(err) { console.log(err); }
+}
+
+/* Returns true if url exists */
+function isValidURL(url) {
+    var request = new XMLHttpRequest();
+    request.open('GET', url, false);
+    request.send(); // pauses till found or error
+    console.log(request.status);
+    return request.status !== 0 && request.status !== 404;
+}
+
+function getMenuURL() {
+    return new Promise((resolve, reject) => {
+        request('http://www.sth-hollabrunn.at/speisplan', (error, response, html) => {
+            if (!error && response.statusCode == 200) {
+                const regex = /img src=[\'"]?([^\'" >]+)/g
+                let url = html.match(regex)[1].substr(9);
+                url = url.replace(/w_[0-9]+/, "w_1355"); // width
+                url = url.replace(/h_[0-9]+/, "h_970"); // height
+                url = url.replace(",blur_2", ""); // remove blur 
+
+                if (isValidURL(url)) {
+                    resolve(url);
+                } else {
+                    reject();
+                }
+            } else {
+                reject();
+            }
+        });
+    });
 }
 
 const client = new Discord.Client();
@@ -305,6 +345,16 @@ client.on("message", function(message) {
         } else {
             message.reply("Please join a voice chat first.");
         }
+        return;
+    }
+
+    if (args[0].toLowerCase() == "menu") {
+        getMenuURL().then(url => {
+            message.channel.send(new Discord.MessageEmbed().setTitle('Menu').setImage(url));
+        }).catch(() => {
+            message.reply("Someting went wrong, please try again later.");
+        });
+
         return;
     }
 
@@ -385,6 +435,26 @@ client.on("message", function(message) {
 });
 
 client.on("ready", () => {
+
+    // Get HTL menu channel by channel id
+    const menuChannel = client.channels.cache.get("763020692861485076"); 
+
+    if (menuChannel) {
+        console.log("HTL-Menu channel found.");
+    } else {
+        return console.error("Couldn't find the channel.");
+    }
+
+    setInterval(function() {
+        let date = new Date();
+        if (date.getDay() == 1 && date.getHours() == 6) { // if monday 6 o'clock send menu
+            getMenuURL().then(url => {
+                message.channel.send(new Discord.MessageEmbed().setTitle('Menu').setImage(url));
+            });
+        }
+    }, 1000 * 60 * 60); // Tick every hour
+    
+
     /* Set bot status message */
     let msg = false;
     setInterval(function() {
