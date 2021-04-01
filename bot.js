@@ -176,19 +176,20 @@ function saveSettings() {
 }
 
 /* loads server settings form json file */
-function loadSettings() {
+async function loadSettings() {
     fs.readFile('data.json', (err, json) => {
         if (err) return;
         let data = JSON.parse(json);
         for (serverId in data) {
-            console.log(`Loading setting for server '${serverId}'`);
-            loadServerSettings(serverId, data[serverId], undefined, false);
+	    console.log(`Loading setting for server '${serverId}'`);
+	    loadServerSettings(serverId, data[serverId], undefined, false);
         }
     });
 }
 
 /* loads server setting from server id */
 async function loadServerSettings(id, name, message, store) {
+
     let schools = await Webuntis.findSchool(name); // search for HTL-Hollabrunn
 
     // No school found
@@ -202,33 +203,40 @@ async function loadServerSettings(id, name, message, store) {
     // Setup cookie -> set schoolname
     let school = await Webuntis.setupCookie(schools[0]); 
 
-    // Init with empty classes
-    SCHOOLS[id] = { 
-        name: name, 
-        classes: [] 
-    }; 
-
-    if (message != undefined) {
-        message.reply(`Set school to ${schools[0].displayName}`);
-    }
-
-    // Save setting
-    if (store) {
-        saveSettings();
-    }
-
     // search departments of school
-    let departments = await Webuntis.findDepartments(school); 
+    try {
+        let departments = await Webuntis.findDepartments(school); 
 
-    if (departments != null) {
-        // search classes in departments
-        for (i in departments) {
-            SCHOOLS[id].classes = SCHOOLS[id].classes.concat(await Webuntis.findClasses(departments[i])); 
+        // Init with empty classes
+        SCHOOLS[id] = { 
+            name: name, 
+            classes: [] 
+        }; 
+
+        if (message != undefined) {
+            message.reply(`Set school to ${schools[0].displayName}`);
         }
-    } else {
-        // search classes in school
-        SCHOOLS[id].classes = await Webuntis.findClasses(school); 
+
+        // Save setting
+        if (store) {
+            saveSettings();
+        }
+
+    	if (departments != null) {
+            // search classes in departments
+            for (i in departments) {
+            	SCHOOLS[id].classes = SCHOOLS[id].classes.concat(await Webuntis.findClasses(departments[i])); 
+            }
+        } else {
+            // search classes in school
+            SCHOOLS[id].classes = await Webuntis.findClasses(school); 
+        }
+    } catch(e) {
+        if (message != undefined) {
+	    message.reply("Something went wrong, maybe your school has no public timetables?");
+        }
     }
+
 }
 
 /* Orignal: https://stackoverflow.com/questions/11971130/converting-a-date-to-european-format */
@@ -316,6 +324,7 @@ client.on("message", function(message) {
             .setDescription("A list of commands for the Webuntis Bot. For more infos, changelog or if you want to add this bot to your server go [here](https://github.com/danielfvm/webuntis-js).")
             .addField(hasPerm ? "Set school" : "~~Set school~~", `${config.PREFIX} set <school>`, true)
             .addField("Text to voice", `${config.PREFIX} play <message>`, true)
+            .addField("Get htl-sth's menu plan", `${config.PREFIX} menu`, true)
             .addField("Timetable", `${config.PREFIX} <class>`, true)
             .addField("Today's Schedule", `${config.PREFIX} <class> today`, true)
             .addField("Tomorrow's Schedule", `${config.PREFIX} <class> tomorrow`, true)
@@ -333,7 +342,7 @@ client.on("message", function(message) {
         } else if (!hasPerm) {
             message.reply("You are not administrator!");
         } else {
-            loadServerSettings(id, args.slice(1, args.length).join(' '), message, true);
+	    loadServerSettings(id, args.slice(1, args.length).join(' '), message, true);
         }
         return;
     }
@@ -438,6 +447,7 @@ client.on("ready", () => {
 
     // Get HTL menu channel by channel id
     const menuChannel = client.channels.cache.get("763020692861485076"); 
+    //const menuChannel = client.channels.cache.get("696293614036451412"); 
 
     if (menuChannel) {
         console.log("HTL-Menu channel found.");
@@ -449,7 +459,7 @@ client.on("ready", () => {
         let date = new Date();
         if (date.getDay() == 1 && date.getHours() == 6) { // if monday 6 o'clock send menu
             getMenuURL().then(url => {
-                message.channel.send(new Discord.MessageEmbed().setTitle('Menu').setImage(url));
+                menuChannel.send(new Discord.MessageEmbed().setTitle('Menu').setImage(url));
             });
         }
     }, 1000 * 60 * 60); // Tick every hour

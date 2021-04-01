@@ -38,13 +38,19 @@ const Webuntis = {
     findDepartments: async function(school) {
         let path = '/WebUntis/api/public/timetable/weekly/pageconfig?type=1';
         let res = await Webuntis.request(school.server, path, '', 'GET', school.cookie);
-        let result = JSON.parse(res.content).data.filters;
+	    console.log(">"+res.content+"<");
+	try {
+            let result = JSON.parse(res.content).data.filters;
 
-        if (result.length > 0) {
-            let departments = result[0].elements;
-            departments.forEach(x => x.school = school);
-            return departments;
-        }
+            if (result.length > 0) {
+                let departments = result[0].elements;
+                departments.forEach(x => x.school = school);
+                return departments;
+            }
+
+	} catch(e) {
+	    throw new Error("Failed parsing department info");
+	}
 
         return null;
     },
