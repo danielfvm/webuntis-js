@@ -13,7 +13,7 @@
     "xmlhttprequest": "^1.8.0"
   },
   "scripts": {
-    "test": "node bot.js"
+    "start": "node src/bot.js"
   },
   "author": "Daniel Schloegl (DeanCode)",
   "license": "ISC"
