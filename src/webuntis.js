@@ -38,8 +38,8 @@ const Webuntis = {
     findDepartments: async function(school) {
         let path = '/WebUntis/api/public/timetable/weekly/pageconfig?type=1';
         let res = await Webuntis.request(school.server, path, '', 'GET', school.cookie);
-	    console.log(">"+res.content+"<");
-	try {
+
+        try {
             let result = JSON.parse(res.content).data.filters;
 
             if (result.length > 0) {
@@ -47,10 +47,9 @@ const Webuntis = {
                 departments.forEach(x => x.school = school);
                 return departments;
             }
-
-	} catch(e) {
-	    throw new Error("Failed parsing department info");
-	}
+        } catch(e) {
+            throw new Error("Failed parsing department info");
+        }
 
         return null;
     },
@@ -86,10 +85,9 @@ const Webuntis = {
     },
 
     /* Returns timetable of class */
-    getTimetable: async function(clazz) {
+    getTimetable: async function(clazz, date = new Date()) {
         let isDepartment = clazz.section.school != undefined;
         let school = isDepartment ? clazz.section.school : clazz.section;
-        let date = new Date();
 
         // if sunday, set to next week
         if (date.getDay() == 0) { 
