@@ -1,4 +1,4 @@
-# webuntis-js
+# webuntis-js (outdated)
 A JavaScript Discord bot for [Webuntis.com](https://webuntis.com/)
 
 ![Screenshot](https://github.com/danielfvm/webuntis-js/blob/main/res/screenshot.png?raw=true)
